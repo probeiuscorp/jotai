@@ -47,6 +47,7 @@ export interface Atom<Value> {
    * @private
    */
   debugPrivate?: boolean
+  map<V>(fn: (a: Value) => V): Atom<V>
 }
 
 export interface WritableAtom<Value, Args extends unknown[], Result>
@@ -95,13 +96,12 @@ export function atom<Value, Args extends unknown[], Result>(
   write?: Write<Args, Result>,
 ) {
   const key = `atom${++keyCount}`
-  const config = {
-    toString() {
-      return import.meta.env?.MODE !== 'production' && this.debugLabel
-        ? key + ':' + this.debugLabel
-        : key
-    },
-  } as WritableAtom<Value, Args, Result> & { init?: Value | undefined }
+  const config: WritableAtom<Value, Args, Result> & { init?: Value | undefined } = Object.create(atomPrototype)
+  config.toString = function() {
+    return import.meta.env?.MODE !== 'production' && this.debugLabel
+      ? key + ':' + this.debugLabel
+      : key
+  }
   if (typeof read === 'function') {
     config.read = read as Read<Value, SetAtom<Args, Result>>
   } else {
@@ -114,6 +114,11 @@ export function atom<Value, Args extends unknown[], Result>(
   }
   return config
 }
+
+export function map<T, V>(this: Atom<T>, fn: (a: T) => V): Atom<V> {
+  return atom((get) => fn(get(this)));
+}
+export const atomPrototype = { map };
 
 function defaultRead<Value>(this: Atom<Value>, get: Getter) {
   return get(this)
